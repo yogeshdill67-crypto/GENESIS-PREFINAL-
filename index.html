@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GENESIS v2 - Carrier & Domain platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: { teal: { 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488' } },
+      fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+    }
+  }
+}
+</script>
+<style>
+body { margin: 0; background-color: #0f172a; color: white; transition: background-color 0.4s, color 0.4s; overflow-x: hidden; }
+body.light-mode { background-color: #f8fafc; color: #0f172a; }
+.glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); }
+.light-mode .glass { background: rgba(255, 255, 255, 0.7); border: 1px solid rgba(0, 0, 0, 0.1); }
+
+@keyframes floatY { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+@keyframes driftOrb { 0% { transform: translate(0px, 0px) scale(1); } 33% { transform: translate(30px, -20px) scale(1.05); } 66% { transform: translate(-20px, 15px) scale(0.97); } 100% { transform: translate(0px, 0px) scale(1); } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.float-1 { animation: floatY 4s ease-in-out infinite; }
+.float-2 { animation: floatY 5s ease-in-out infinite 0.5s; }
+.float-3 { animation: floatY 4.5s ease-in-out infinite 1s; }
+.float-4 { animation: floatY 6s ease-in-out infinite 1.5s; }
+.float-5 { animation: floatY 6s ease-in-out infinite; } /* Panel slow bob */
+
+.orb { position: fixed; border-radius: 50%; filter: blur(120px); opacity: 0.4; z-index: -1; animation: driftOrb 25s ease-in-out infinite; }
+.orb-1 { width: 400px; height: 400px; background: #00d4c8; top: -100px; left: -100px; }
+.orb-2 { width: 500px; height: 500px; background: #8b5cf6; bottom: -200px; right: -100px; animation-delay: -10s; }
+
+.nav-link { position: relative; }
+.nav-link::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 2px; background: #00d4c8; transition: width 0.3s; }
+.nav-link.active::after, .nav-link:hover::after { width: 100%; }
+
+.mesh-grad { background: radial-gradient(circle at 0% 0%, #0f766e 0%, transparent 50%), radial-gradient(circle at 100% 100%, #1d4ed8 0%, transparent 50%); }
+
+#search-overlay, #modal-overlay { display: none; opacity: 0; transition: opacity 0.3s; }
+#search-overlay.active, #modal-overlay.active { display: flex; opacity: 1; }
+
+.tree-node-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+.tree-node-content.expanded { max-height: 1000px; }
+.rot-90 { transform: rotate(90deg); transition: transform 0.2s; }
+</style>
+</head>
+<body class="antialiased">
+<div class="orb orb-1" id="orb1"></div>
+<div class="orb orb-2" id="orb2"></div>
+
+<!-- Navbar -->
+<nav id="navbar" class="fixed top-0 w-full glass z-50 transition-all duration-300" style="transform: translateY(-64px);">
+  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div class="text-xl font-bold font-mono tracking-wider cursor-pointer hover:text-teal-400 drop-shadow-[0_0_8px_rgba(45,212,191,0.5)] transition-all float-3" id="logo">GENESIS</div>
+    
+    <div class="hidden md:flex space-x-8">
+      <a href="#home" class="nav-link active font-medium">Home</a>
+      <a href="#explore" class="nav-link font-medium">Explore</a>
+      <a href="#communities" class="nav-link font-medium">Communities</a>
+    </div>
+
+    <div class="flex items-center space-x-4">
+      <button onclick="toggleSearch()" class="p-2 hover:bg-white/10 rounded-full transition-colors group"><i data-lucide="search" class="w-5 h-5 group-hover:text-teal-400"></i></button>
+      <div class="relative">
+        <button onclick="toggleNotifs()" class="p-2 hover:bg-white/10 rounded-full transition-colors float-1"><i data-lucide="bell" class="w-5 h-5"></i><span id="notif-badge" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span></button>
+        <div id="notif-drop" class="hidden absolute right-0 mt-2 w-64 glass rounded-xl shadow-lg border border-white/10 p-2 float-2">
+          <div class="p-2 border-b border-white/10 text-sm font-semibold">Notifications</div>
+          <div class="p-2 text-sm hover:bg-white/5 rounded my-1 cursor-pointer">Arjun liked your post</div>
+          <div class="p-2 text-sm hover:bg-white/5 rounded my-1 cursor-pointer">New paths in ML added</div>
+        </div>
+      </div>
+      <button onclick="toggleTheme()" class="p-2 hover:bg-white/10 rounded-full transition-colors"><i data-lucide="moon" id="theme-icon" class="w-5 h-5"></i></button>
+      <div class="relative cursor-pointer" onclick="document.getElementById('profile-drop').classList.toggle('hidden')">
+        <div class="w-8 h-8 rounded-full bg-teal-500/20 border border-teal-500/50 flex items-center justify-center float-4"><i data-lucide="user" class="w-4 h-4 text-teal-400"></i></div>
+        <div id="profile-drop" class="hidden absolute right-0 mt-2 w-48 glass rounded-xl shadow-lg border border-white/10 py-1 float-1">
+          <div class="px-4 py-2 hover:bg-white/5 hover:border-l-2 border-teal-400 cursor-pointer">View Profile</div>
+          <div class="px-4 py-2 hover:bg-white/5 hover:border-l-2 border-teal-400 cursor-pointer">Settings</div>
+          <div class="px-4 py-2 hover:bg-white/5 hover:border-l-2 border-red-400 cursor-pointer text-red-400">Sign Out</div>
+        </div>
+      </div>
+      <button class="md:hidden p-2" onclick="toggleMobileMenu()"><i data-lucide="menu"></i></button>
+    </div>
+  </div>
+</nav>
+
+<!-- Main Grid -->
+<main class="pt-24 pb-20 max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-screen">
+  
+  <!-- LEFT SIDEBAR -->
+  <aside class="lg:col-span-3 space-y-4 opacity-0" id="left-sidebar" style="transform: translateY(20px);">
+    <div class="glass rounded-2xl p-6 physics-card float-1">
+      <div class="flex flex-col items-center">
+        <div class="w-20 h-20 rounded-full relative flex items-center justify-center float-2">
+          <div class="absolute inset-0 rounded-full border-2 border-dashed border-teal-400/50 animate-[spin_4s_linear_infinite]"></div>
+          <i data-lucide="user" class="w-8 h-8 text-white"></i>
+        </div>
+        <h2 class="mt-4 font-bold text-xl" id="profile-name">Alex Dev</h2>
+        <div class="font-mono text-teal-400 text-sm mt-1 h-5" id="typewriter"></div>
+      </div>
+      <div class="flex justify-between mt-6 text-center divide-x divide-white/10">
+        <div class="w-1/3 cursor-pointer" onclick="animateCounter('post-count', 12)"><div class="font-bold text-lg" id="post-count">0</div><div class="text-xs text-slate-400">Posts</div></div>
+        <div class="w-1/3 cursor-pointer" onclick="animateCounter('conn-count', 340)"><div class="font-bold text-lg" id="conn-count">0</div><div class="text-xs text-slate-400">Conns</div></div>
+        <div class="w-1/3 cursor-pointer" onclick="animateCounter('comm-count', 5)"><div class="font-bold text-lg" id="comm-count">0</div><div class="text-xs text-slate-400">Comms</div></div>
+      </div>
+      <button onclick="openCreatePostModal()" class="w-full mt-6 py-2 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30 transition-colors">Create Post</button>
+    </div>
+  </aside>
+
+  <!-- CENTER FEED -->
+  <section class="lg:col-span-9 space-y-4 opacity-0" id="center-feed">
+    <!-- Create Post -->
+    <div class="glass rounded-2xl p-4 physics-card float-2" id="create-post-card">
+      <textarea id="post-input" rows="1" class="w-full bg-transparent resize-none outline-none placeholder-slate-400 transition-all duration-300" placeholder="Share your career journey..." onfocus="this.rows=4"></textarea>
+      
+      <div id="attached-img-container" class="hidden relative mt-2 rounded-lg overflow-hidden h-32 bg-slate-800">
+        <img id="attached-img" class="w-full h-full object-cover">
+        <button onclick="removeImage()" class="absolute top-2 right-2 p-1 bg-black/50 rounded-full hover:bg-red-500/80"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="flex items-center justify-between mt-4">
+        <div class="flex space-x-2">
+          <button class="p-2 rounded-full hover:bg-white/10 text-slate-300" title="Image" onclick="document.getElementById('file-in').click()"><i data-lucide="image" class="w-5 h-5"></i></button>
+          <button class="p-2 rounded-full hover:bg-white/10 text-slate-300" title="Link"><i data-lucide="link" class="w-5 h-5"></i></button>
+          <button class="p-2 rounded-full hover:bg-white/10 text-teal-400" title="Domain" onclick="toggleDomainPicker()"><i data-lucide="compass" class="w-5 h-5"></i></button>
+          <input type="file" id="file-in" class="hidden" accept="image/*" onchange="previewImage(event)">
+        </div>
+        <button onclick="publishPost()" id="publish-btn" class="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-900 font-bold rounded-lg transition-transform hover:scale-105">Publish</button>
+      </div>
+      <!-- Domain Picker Dropdown -->
+      <div id="domain-picker" class="hidden mt-2 p-3 glass rounded-lg border border-white/5">
+        <div class="text-sm text-slate-300 mb-2">Select Domain Tag:</div>
+        <div class="flex flex-wrap gap-2" id="dp-tags">
+          <span class="px-3 py-1 rounded-full bg-teal-500/20 text-teal-400 text-xs cursor-pointer border border-teal-500/30 hover:bg-teal-500/40" onclick="setPostDomain('B.Tech → CSE')">B.Tech → CSE</span>
+          <span class="px-3 py-1 rounded-full bg-slate-500/20 text-slate-300 text-xs cursor-pointer border border-slate-500/30 hover:bg-slate-500/40" onclick="setPostDomain('MBA → Finance')">MBA → Finance</span>
+        </div>
+      </div>
+    </div>
+    
+    <div id="feed-posts" class="space-y-4">
+      <!-- Posts rendered here via JS -->
+    </div>
+  </section>
+
+</main>
+
+<!-- Explore View (Full Page) -->
+<section id="explore-view" class="pt-24 pb-20 max-w-7xl mx-auto px-4 hidden min-h-screen">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+    <div class="lg:col-span-4 space-y-6">
+      <div class="glass rounded-2xl p-6 physics-card float-5 h-fit">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold font-mono tracking-tight"><i data-lucide="map" class="inline w-6 h-6 mr-3 text-violet-400"></i>Domain Explorer</h2>
+        </div>
+        <input type="text" id="domain-search-full" placeholder="Search career paths..." class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-lg outline-none focus:border-teal-400 mb-6 transition-all" onkeyup="filterTree(this.value)">
+        
+        <div class="flex space-x-3 mb-6">
+          <button class="flex-1 py-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors font-medium border border-white/5" onclick="expandAll(true)">Expand All</button>
+          <button class="flex-1 py-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors font-medium border border-white/5" onclick="expandAll(false)">Collapse All</button>
+        </div>
+
+        <div id="domain-tree" class="space-y-1 overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
+          <!-- Tree rendered by JS -->
+        </div>
+      </div>
+    </div>
+    
+    <div class="lg:col-span-8">
+      <div id="domain-details" class="glass rounded-2xl p-8 min-h-[600px] flex flex-col items-center justify-center text-center opacity-0 transition-opacity duration-500 float-1">
+        <div class="w-24 h-24 rounded-full bg-teal-500/10 flex items-center justify-center mb-6">
+          <i data-lucide="compass" class="w-12 h-12 text-teal-400"></i>
+        </div>
+        <h3 class="text-2xl font-bold mb-2">Select a Career Path</h3>
+        <p class="text-slate-400 max-w-md">Choose a role from the tree to view required skills, top companies, and market demand insights.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Communities Section -->
+<section id="communities" class="max-w-7xl mx-auto px-4 py-16 hidden">
+  <h2 class="text-3xl font-bold mb-8">Communities</h2>
+  <div class="flex space-x-6 mb-8 border-b border-white/10">
+    <button class="pb-2 border-b-2 border-teal-400 font-bold" onclick="filterComms('All', this)">All</button>
+    <button class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-white" onclick="filterComms('Joined', this)">Joined</button>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="comm-grid">
+    <!-- Generated by JS -->
+  </div>
+</section>
+
+<!-- Overlays & Modals -->
+<div id="search-overlay" class="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-md pt-20 px-4">
+  <div class="max-w-3xl mx-auto w-full" id="search-box" style="transform: translateY(-50px); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
+    <div class="relative">
+      <i data-lucide="search" class="absolute left-4 top-4 text-slate-400 w-6 h-6"></i>
+      <input type="text" class="w-full bg-white/10 border border-white/20 rounded-2xl pl-14 pr-4 py-4 text-xl outline-none focus:bg-white/15 focus:border-teal-400 text-white shadow-2xl" placeholder="Search posts, domains, communities..." onkeyup="handleSearch(this.value, event)" autofocus id="search-input">
+      <button class="absolute right-4 top-4 text-slate-400 hover:text-white" onclick="toggleSearch()"><i data-lucide="x"></i></button>
+    </div>
+    <div id="search-results" class="mt-4 space-y-2"></div>
+  </div>
+</div>
+
+<div id="modal-overlay" class="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm items-center justify-center" onclick="if(event.target===this) closeModal()">
+  <div id="modal-content" class="glass w-full max-w-md rounded-2xl p-6 m-4 relative" style="transform: translateY(40px); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);">
+    <button class="absolute top-4 right-4 text-slate-400 hover:text-white" onclick="closeModal()"><i data-lucide="x"></i></button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast-container" class="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none"></div>
+
+<button id="back-to-top" class="fixed bottom-6 right-6 w-12 h-12 glass rounded-full flex items-center justify-center opacity-0 translate-y-10 transition-all duration-300 z-50 float-2 hover:bg-teal-500/20" onclick="window.scrollTo({top:0, behavior:'smooth'})"><i data-lucide="chevron-up" class="w-6 h-6"></i></button>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  lucide.createIcons();
+  initTheme();
+  initPageLoadAnims();
+  initPhysics();
+  initParallax();
+  typewriter('B.Tech → CSE → ML Engineer');
+  renderFeed();
+  renderTree();
+  renderCommunities();
+  loadPersisted();
+  handleNavigation();
+});
+
+window.addEventListener('hashchange', handleNavigation);
+
+function handleNavigation() {
+  const hash = window.location.hash || '#home';
+  const views = {
+    '#home': document.querySelector('main'),
+    '#explore': document.getElementById('explore-view'),
+    '#communities': document.getElementById('communities')
+  };
+
+  Object.keys(views).forEach(v => {
+    if(views[v]) views[v].classList.add('hidden');
+  });
+
+  if(views[hash]) {
+    views[hash].classList.remove('hidden');
+    // Special transition for explore view
+    if(hash === '#explore') {
+       views[hash].style.opacity = '0';
+       setTimeout(()=> {
+         views[hash].style.opacity = '1';
+         views[hash].style.transition = 'opacity 0.6s';
+       }, 50);
+    }
+  }
+
+  // Update active state in nav
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.remove('active');
+    if(link.getAttribute('href') === hash) link.classList.add('active');
+  });
+}
+
+function navigateTo(view) {
+  // If user explicitly clicks explore, and they wanted it in a "new page", 
+  // they can Ctrl+Click or we could use target="_blank" in HTML.
+  // We'll let the default anchor behavior trigger hashchange.
+}
+const domainTree = {
+  "B.Tech": {
+    "Computer Science": {
+      roles: {
+        "ML Engineer": { skills: ["Python","TensorFlow","PyTorch"], companies: ["Google","OpenAI"] },
+        "Backend Dev": { skills: ["Node.js","Java"], companies: ["Amazon","Atlassian"] }
+      }
+    },
+    "Mechanical": {
+      roles: { "EV Engineer": { skills: ["MATLAB","Battery BMS"], companies: ["Tesla","Ather"] } }
+    }
+  },
+  "MBA": {
+    "Marketing": { roles: { "Growth Hacker": { skills: ["SEO","Analytics"], companies: ["PhonePe"] } } }
+  }
+};
+
+let posts = [
+  { id: 1, author: "Arjun Mehta", path: "CSE → ML Engineer", content: "Just cracked my Google SWE interview! DM me for tips.", likes: 124, comments: 18, domain: "B.Tech → CSE", isLiked: false },
+  { id: 2, author: "Priya Sharma", path: "Mech → Product Design", content: "EV industry needs mechanical engineers. Don't sleep on core!", likes: 89, comments: 31, domain: "B.Tech → Mech", isLiked: false }
+];
+
+let communities = [
+  { id: 1, name: "CS & AI", domain: "B.Tech → CSE", members: 12400, tags: ["#ML", "#WebDev"], joined: false },
+  { id: 2, name: "Mech & EV", domain: "B.Tech → Mech", members: 6820, tags: ["#EV", "#CAD"], joined: false },
+  { id: 3, name: "MBA Startups", domain: "MBA", members: 5330, tags: ["#VC", "#Startups"], joined: true }
+];
+
+// PHYSICS
+function initPhysics() {
+  document.querySelectorAll('.physics-card').forEach(addPhysics);
+}
+
+function addPhysics(card) {
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    const x = (e.clientX - rect.left - rect.width / 2) / rect.width;
+    const y = (e.clientY - rect.top - rect.height / 2) / rect.height;
+    card.style.transform = `translateY(-6px) rotateX(${y * -8}deg) rotateY(${x * 8}deg) scale(1.02)`;
+    card.style.transition = 'transform 0.1s ease';
+  });
+  card.addEventListener('mouseleave', () => {
+    card.style.transform = '';
+    card.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+  });
+}
+
+function initParallax() {
+  window.addEventListener('scroll', () => {
+    const sY = window.scrollY;
+    document.getElementById('orb1').style.transform = `translateY(${sY * 0.15}px)`;
+    document.getElementById('orb2').style.transform = `translateY(${sY * -0.10}px)`;
+    document.getElementById('navbar').style.backdropFilter = sY > 50 ? 'blur(30px)' : 'blur(16px)';
+    
+    const btt = document.getElementById('back-to-top');
+    if(sY > 400) { btt.style.opacity = 1; btt.style.transform = 'translateY(0)'; btt.style.pointerEvents = 'auto'; }
+    else { btt.style.opacity = 0; btt.style.transform = 'translateY(40px)'; btt.style.pointerEvents = 'none'; }
+    updateActiveNav();
+  });
+}
+
+function initPageLoadAnims() {
+  setTimeout(()=> document.getElementById('navbar').style.transform = 'translateY(0)', 100);
+  setTimeout(()=> { let el = document.getElementById('left-sidebar'); el.style.opacity=1; el.style.transform='translateY(0)'; el.style.transition='all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'; }, 500);
+  setTimeout(()=> { let el = document.getElementById('center-feed'); el.style.opacity=1; el.style.transition='opacity 0.6s'; }, 600);
+}
+
+// COMPONENTS
+function typewriter(text) {
+  const el = document.getElementById('typewriter');
+  el.innerHTML = '';
+  let i = 0;
+  let interval = setInterval(() => {
+    el.innerHTML = text.substring(0, i+1) + (i < text.length - 1 ? '<span class="animate-pulse">|</span>' : '');
+    i++;
+    if(i === text.length) clearInterval(interval);
+  }, 100);
+}
+
+function animateCounter(id, target) {
+  const el = document.getElementById(id);
+  let count = 0;
+  let speed = target / 30; // 60fps, 500ms
+  function update() {
+    count += speed;
+    if(count < target) {
+      el.innerText = Math.floor(count);
+      requestAnimationFrame(update);
+    } else {
+      el.innerText = target;
+    }
+  }
+  update();
+}
+
+function showToast(msg, type='success') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  const color = type === 'success' ? 'border-teal-500 text-teal-400' : 'border-red-500 text-red-400';
+  t.className = `glass px-4 py-2 rounded-lg border-l-4 ${color} transform translate-x-[120%] transition-transform duration-300 float-1`;
+  t.innerText = msg;
+  c.appendChild(t);
+  setTimeout(()=> t.style.transform = 'translate-x-[0%]', 10);
+  setTimeout(()=> {
+    t.style.transform = 'translate-x-[120%]';
+    setTimeout(()=> t.remove(), 300);
+  }, 3000);
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('light-mode');
+  const icon = document.getElementById('theme-icon');
+  const isLight = document.body.classList.contains('light-mode');
+  icon.setAttribute('data-lucide', isLight ? 'sun' : 'moon');
+  lucide.createIcons();
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+}
+function initTheme() {
+  if(localStorage.getItem('theme') === 'light') toggleTheme();
+}
+
+// FEED
+let selectedDomain = '';
+function toggleDomainPicker() {
+  document.getElementById('domain-picker').classList.toggle('hidden');
+}
+function setPostDomain(d) {
+  selectedDomain = d;
+  showToast(`Domain set to ${d}`);
+  toggleDomainPicker();
+}
+
+function publishPost() {
+  const input = document.getElementById('post-input');
+  if(!input.value.trim()) {
+    const btn = document.getElementById('publish-btn');
+    btn.classList.add('animate-[bounce_0.2s_2]');
+    setTimeout(()=>btn.classList.remove('animate-[bounce_0.2s_2]'), 400);
+    return;
+  }
+  
+  const newPost = {
+    id: Date.now(), author: "Alex Dev", path: "B.Tech → CSE", content: input.value, likes: 0, comments: 0, domain: selectedDomain || "General", isLiked: false
+  };
+  posts.unshift(newPost);
+  saveData();
+  renderFeed();
+  input.value = '';
+  input.rows = 1;
+  document.getElementById('attached-img-container').classList.add('hidden');
+  
+  const btn = document.getElementById('publish-btn');
+  const oldText = btn.innerText;
+  btn.innerText = '✓ Published!';
+  setTimeout(()=> btn.innerText = oldText, 2000);
+}
+
+function renderFeed() {
+  const c = document.getElementById('feed-posts');
+  c.innerHTML = '';
+  posts.forEach((p, i) => {
+    const d = i%3+1;
+    c.innerHTML += `
+      <div class="glass rounded-2xl p-5 physics-card float-${d}" id="post-${p.id}" style="transform-origin:center; opacity:0; transform:translateY(20px); animation: fadeIn 0.5s forwards ${i*0.1}s">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-teal-400 to-violet-500 flex items-center justify-center font-bold">${p.author[0]}</div>
+            <div>
+              <div class="font-bold">${p.author}</div>
+              <div class="text-xs text-slate-400 font-mono">${p.path} · ${p.domain}</div>
+            </div>
+          </div>
+          <button class="text-slate-400 hover:text-white" onclick="showPostMenu(${p.id})"><i data-lucide="more-horizontal" class="w-5 h-5"></i></button>
+        </div>
+        <p class="mt-4 text-sm leading-relaxed">${p.content.replace(/\n/g, '<br>')}</p>
+        <div class="flex items-center space-x-6 mt-4 pt-4 border-t border-white/10">
+          <button class="flex items-center space-x-1 ${p.isLiked?'text-red-500':'text-slate-400 hover:text-red-400'} group relative" onclick="toggleLike(${p.id}, this)">
+            <i data-lucide="heart" class="w-5 h-5 transition-transform group-hover:scale-110 ${p.isLiked?'fill-current':''}"></i>
+            <span>${p.likes}</span>
+          </button>
+          <button class="flex items-center space-x-1 text-slate-400 hover:text-teal-400 transition-colors" onclick="toggleComment(${p.id})">
+            <i data-lucide="message-square" class="w-5 h-5"></i><span>${p.comments}</span>
+          </button>
+          <button class="flex items-center space-x-1 text-slate-400 hover:text-blue-400 transition-colors" onclick="copyLink()">
+            <i data-lucide="share-2" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div id="comments-${p.id}" class="hidden mt-4 space-y-2">
+          <input type="text" class="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none focus:border-teal-400 border border-transparent" placeholder="Write a comment..." onkeydown="if(event.key==='Enter'){ addComment(${p.id}, this); }">
+          <div id="clist-${p.id}"></div>
+        </div>
+      </div>
+    `;
+  });
+  lucide.createIcons();
+  document.querySelectorAll('#feed-posts .physics-card').forEach(addPhysics);
+}
+
+function toggleLike(id, btn) {
+  let p = posts.find(x=>x.id===id);
+  p.isLiked = !p.isLiked;
+  p.likes += p.isLiked ? 1 : -1;
+  saveData();
+  
+  const icon = btn.querySelector('svg');
+  btn.classList.toggle('text-red-500');
+  btn.classList.toggle('text-slate-400');
+  if(p.isLiked) {
+    icon.classList.add('fill-current', 'scale-125');
+    setTimeout(()=> icon.classList.remove('scale-125'), 200);
+    burstParticles(btn);
+  } else {
+    icon.classList.remove('fill-current');
+  }
+  btn.querySelector('span').innerText = p.likes;
+}
+
+function burstParticles(el) {
+  const rect = el.getBoundingClientRect();
+  for(let i=0; i<6; i++) {
+    const p = document.createElement('div');
+    p.innerHTML = '❤️';
+    p.style.position = 'fixed';
+    p.style.left = (rect.left + rect.width/2) + 'px';
+    p.style.top = (rect.top + rect.height/2) + 'px';
+    p.style.fontSize = '12px';
+    p.style.pointerEvents = 'none';
+    p.style.zIndex = 9999;
+    p.style.transition = 'all 0.6s ease-out';
+    document.body.appendChild(p);
+    
+    const angle = (i/6) * Math.PI * 2;
+    const dist = 40 + Math.random()*20;
+    setTimeout(() => {
+      p.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist - 20}px) scale(0)`;
+      p.style.opacity = '0';
+    }, 10);
+    setTimeout(()=> p.remove(), 600);
+  }
+}
+
+function toggleComment(id) { document.getElementById(`comments-${id}`).classList.toggle('hidden'); }
+function addComment(id, input) {
+  if(!input.value) return;
+  let p = posts.find(x=>x.id===id);
+  p.comments++;
+  const cList = document.getElementById(`clist-${id}`);
+  const d = document.createElement('div');
+  d.className = 'bg-white/5 rounded p-2 text-sm';
+  d.innerHTML = `<b>You:</b> ${input.value}`;
+  cList.appendChild(d);
+  input.value='';
+  renderFeed(); // to update count
+}
+
+function showPostMenu(id) {
+  let p = document.getElementById(`post-${id}`);
+  p.style.transition = 'all 0.4s';
+  p.style.transform = 'scale(0.8)';
+  p.style.opacity = '0';
+  setTimeout(()=> {
+    posts = posts.filter(x=>x.id!==id);
+    renderFeed();
+    showToast('Post removed');
+  }, 400);
+}
+
+function copyLink() {
+  navigator.clipboard.writeText('https://genesis.app/p/123');
+  showToast('Link copied to clipboard!');
+}
+
+// TREE EXPLORER
+function renderTree() {
+  const c = document.getElementById('domain-tree');
+  c.innerHTML = buildNode(domainTree, 0);
+  lucide.createIcons();
+}
+
+function buildNode(obj, depth) {
+  let html = '';
+  for(let key in obj) {
+    const hasChildren = typeof obj[key] === 'object' && obj[key] !== null;
+    const isRole = obj[key]?.skills;
+    const padding = depth * 12;
+    const iconColor = depth === 0 ? 'text-teal-400' : isRole ? 'text-violet-400' : 'text-blue-400';
+    
+    html += `<div class="node-container" style="padding-left: ${padding}px">`;
+    html += `
+      <div class="flex items-center justify-between py-2 cursor-pointer hover:bg-white/5 rounded px-2" onclick="toggleNode(this)">
+        <div class="flex items-center space-x-2">
+          <div class="w-2 h-2 rounded-full ${iconColor} bg-current shadow-[0_0_8px_currentColor]"></div>
+          <span class="${isRole ? 'font-medium' : ''}">${key}</span>
+        </div>
+        ${!isRole ? `<i data-lucide="chevron-right" class="w-4 h-4 transition-transform text-slate-400"></i>` : ''}
+      </div>
+    `;
+    
+    if(isRole) {
+      html += `<div class="tree-node-content pl-4 border-l border-white/10 ml-3">
+        <div class="py-2 text-xs">
+          <div class="mb-2 text-slate-400">Skills</div>
+          <div class="flex flex-wrap gap-1 mb-3">
+            ${obj[key].skills.map(s => `<span class="px-2 py-1 bg-white/10 rounded-full float-1">${s}</span>`).join('')}
+          </div>
+          <div class="mb-2 text-slate-400">Top Companies</div>
+          <div class="flex flex-wrap gap-1">
+            ${obj[key].companies.map(c => `<span class="px-2 py-1 border border-teal-500/30 rounded cursor-pointer hover:bg-teal-500/20" onclick="showToast('Viewing ${c} jobs -> Coming soon!', 'info')">${c}</span>`).join('')}
+          </div>
+          <button class="w-full mt-4 py-2 bg-teal-500/10 text-teal-400 rounded hover:bg-teal-500/20 transition-colors border border-teal-500/30" onclick="showRoleDetails('${key}', ${JSON.stringify(obj[key]).replace(/"/g, '&quot;')})">View Full Insights</button>
+        </div>
+      </div>`;
+    } else if (hasChildren) {
+      if(obj[key].roles) {
+        html += `<div class="tree-node-content">${buildNode(obj[key].roles, depth+1)}</div>`;
+      } else {
+        html += `<div class="tree-node-content">${buildNode(obj[key], depth+1)}</div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  return html;
+}
+
+function toggleNode(el) {
+  const content = el.nextElementSibling;
+  const icon = el.querySelector('[data-lucide="chevron-right"]');
+  if(!content || !content.classList.contains('tree-node-content')) return;
+  
+  const isExpanded = content.classList.contains('expanded');
+  
+  if(!event.shiftKey) {
+    // Accordion close peers
+    const peers = el.parentElement.parentElement.children;
+    for(let p of peers) {
+      if(p !== el.parentElement && p.classList.contains('node-container')) {
+        const pCont = p.children[1];
+        const pIcon = p.querySelector('[data-lucide="chevron-right"]');
+        if(pCont && pCont.classList.contains('expanded')) {
+          pCont.classList.remove('expanded');
+          if(pIcon) pIcon.classList.remove('rot-90');
+        }
+      }
+    }
+  }
+
+  content.classList.toggle('expanded');
+  if(icon) icon.classList.toggle('rot-90');
+}
+
+function expandAll(expand) {
+  document.querySelectorAll('.tree-node-content').forEach(el => {
+    if(expand) el.classList.add('expanded');
+    else el.classList.remove('expanded');
+  });
+  document.querySelectorAll('[data-lucide="chevron-right"]').forEach(icon => {
+    if(expand) icon.classList.add('rot-90');
+    else icon.classList.remove('rot-90');
+  });
+}
+
+function filterTree(val) {
+  val = val.toLowerCase();
+  document.querySelectorAll('#domain-tree .node-container').forEach(el => {
+    if(el.innerText.toLowerCase().includes(val)) {
+      el.style.opacity = 1;
+      if(val && el.children[1]) {
+        el.children[1].classList.add('expanded');
+        if(el.querySelector('svg')) el.querySelector('svg').classList.add('rot-90');
+      }
+    } else {
+      el.style.opacity = 0.3;
+      if(el.children[1]) el.children[1].classList.remove('expanded');
+    }
+  });
+}
+
+function showRoleDetails(name, data) {
+  const panel = document.getElementById('domain-details');
+  panel.style.opacity = '0';
+  setTimeout(() => {
+    panel.innerHTML = `
+      <div class="text-left w-full h-full animate-[fadeIn_0.5s_forwards]">
+        <div class="flex justify-between items-start mb-8">
+          <div>
+            <h2 class="text-4xl font-bold text-teal-400 drop-shadow-[0_0_15px_rgba(45,212,191,0.3)]">${name}</h2>
+            <div class="font-mono text-slate-400 mt-2">Career Path Dashboard</div>
+          </div>
+          <div class="px-4 py-2 glass rounded-xl border border-teal-400/30 text-teal-400 font-bold">₹8L - ₹24L PA</div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div class="space-y-6">
+            <h4 class="font-bold flex items-center"><i data-lucide="zap" class="w-5 h-5 mr-2 text-yellow-400"></i>Key Skills</h4>
+            <div class="flex flex-wrap gap-2">
+              ${data.skills.map(s => `<span class="px-4 py-2 bg-white/10 rounded-lg border border-white/10 hover:border-teal-400/50 transition-colors float-1">${s}</span>`).join('')}
+            </div>
+            
+            <h4 class="font-bold mt-8 flex items-center"><i data-lucide="building" class="w-5 h-5 mr-2 text-blue-400"></i>Hiring Ecosystem</h4>
+            <div class="grid grid-cols-2 gap-3">
+              ${data.companies.map(c => `<div class="p-3 glass rounded-xl text-center border border-white/5 hover:border-teal-400/30 transition-all cursor-pointer">${c}</div>`).join('')}
+            </div>
+          </div>
+
+          <div class="glass rounded-2xl p-6 border-dashed border-white/10 flex flex-col justify-center items-center">
+            <i data-lucide="line-chart" class="w-12 h-12 text-slate-600 mb-4"></i>
+            <div class="text-slate-400 text-sm">Market Insights</div>
+            <div class="text-xl font-bold mt-1 text-slate-200">High Growth</div>
+            <button class="mt-6 w-full py-3 bg-teal-500 text-black font-bold rounded-xl hover:scale-105 transition-transform" onclick="showToast('Roadmap details coming soon!')">Unlock Full Roadmap</button>
+          </div>
+        </div>
+      </div>
+    `;
+    lucide.createIcons();
+    panel.style.opacity = '1';
+  }, 300);
+}
+
+// COMMUNITIES
+function renderCommunities(filter='All') {
+  const c = document.getElementById('comm-grid');
+  c.innerHTML = '';
+  communities.filter(x=> filter==='All' || (filter==='Joined' && x.joined)).forEach((com,i) => {
+    c.innerHTML += `
+      <div class="glass rounded-2xl overflow-hidden physics-card float-${i%5+1} cursor-pointer" onclick="openCommunity(${com.id}, event)">
+        <div class="h-24 mesh-grad relative">
+          ${com.joined ? '<span class="absolute top-2 right-2 bg-white/20 backdrop-blur px-2 text-xs rounded">JOINED</span>' : ''}
+        </div>
+        <div class="p-5">
+          <h3 class="font-bold text-lg">${com.name}</h3>
+          <p class="text-xs text-slate-400 mb-3">${com.domain} · ${com.members} members</p>
+          <div class="flex gap-2 mb-4">
+            ${com.tags.map(t=> `<span class="text-xs text-teal-400 bg-teal-500/10 px-2 py-1 rounded">${t}</span>`).join('')}
+          </div>
+          <button class="w-full py-2 rounded font-bold transition-all ${com.joined ? 'bg-teal-500 text-slate-900':'bg-white/10 hover:bg-white/20'}" onclick="toggleJoin(${com.id}, event, this)">
+            ${com.joined ? '✓ Joined' : 'Join Community'}
+          </button>
+        </div>
+      </div>
+    `;
+  });
+  document.querySelectorAll('#comm-grid .physics-card').forEach(addPhysics);
+}
+
+function filterComms(filter, btn) {
+  btn.parentElement.querySelectorAll('button').forEach(b => {
+    b.classList.remove('border-teal-400', 'font-bold', 'text-white');
+    b.classList.add('border-transparent', 'text-slate-400');
+  });
+  btn.classList.add('border-teal-400', 'font-bold', 'text-white');
+  btn.classList.remove('border-transparent', 'text-slate-400');
+  renderCommunities(filter);
+}
+
+function toggleJoin(id, e, btn) {
+  e.stopPropagation();
+  let c = communities.find(x=>x.id===id);
+  c.joined = !c.joined;
+  c.members += c.joined ? 1 : -1;
+  btn.innerText = 'Updating...';
+  setTimeout(()=> {
+    saveData();
+    renderCommunities(document.querySelector('.border-teal-400').innerText);
+    showToast(c.joined ? 'Joined community!' : 'Left community');
+  }, 300);
+}
+
+function openCommunity(id, e) {
+  let c = communities.find(x=>x.id===id);
+  const html = `
+    <div class="h-32 mesh-grad -mt-6 -mx-6 rounded-t-2xl mb-4 relative flex items-end p-4">
+      <h2 class="text-2xl font-bold font-mono tracking-wide">${c.name}</h2>
+    </div>
+    <div class="flex justify-between items-center mb-4">
+      <div class="text-sm font-mono text-teal-400">${c.domain}</div>
+      <div class="text-sm border border-white/20 px-2 rounded">${c.members} Mem</div>
+    </div>
+    <div class="space-y-3 mb-6">
+      <div class="p-3 glass rounded flex items-center space-x-3 cursor-pointer hover:bg-white/10"><i data-lucide="link" class="w-4 h-4"></i><span>Starter Guide</span></div>
+      <div class="p-3 glass rounded flex items-center space-x-3 cursor-pointer hover:bg-white/10"><i data-lucide="video" class="w-4 h-4"></i><span>Weekly Meetup</span></div>
+    </div>
+    <button class="w-full py-2 bg-teal-500 text-black font-bold rounded" onclick="toggleJoinModal(${id}, this)">${c.joined ? 'Leave' : 'Join'}</button>
+  `;
+  document.getElementById('modal-body').innerHTML = html;
+  lucide.createIcons();
+  openModal();
+}
+
+function toggleJoinModal(id, btn) {
+  let c = communities.find(x=>x.id===id);
+  c.joined = !c.joined;
+  c.members += c.joined ? 1 : -1;
+  btn.innerText = c.joined ? 'Leave' : 'Join';
+  saveData();
+  renderCommunities();
+  showToast(c.joined ? 'Joined!' : 'Left');
+}
+
+// MODALS AND OVERLAYS
+function openModal() {
+  const ov = document.getElementById('modal-overlay');
+  const co = document.getElementById('modal-content');
+  ov.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  setTimeout(()=> co.style.transform = 'translateY(0)', 10);
+}
+function closeModal() {
+  const ov = document.getElementById('modal-overlay');
+  const co = document.getElementById('modal-content');
+  co.style.transform = 'translateY(40px)';
+  setTimeout(()=> {
+    ov.classList.remove('active');
+    document.body.style.overflow = '';
+  }, 300);
+}
+
+function openEditProfile() {
+  document.getElementById('modal-body').innerHTML = `
+    <h3 class="text-xl font-bold mb-4">Edit Profile</h3>
+    <input type="text" value="Alex Dev" class="w-full bg-white/5 border border-white/10 rounded p-2 mb-3 outline-none focus:border-teal-400" id="ep-name">
+    <input type="text" value="B.Tech → CSE → ML Engineer" class="w-full bg-white/5 border border-white/10 rounded p-2 mb-3 outline-none focus:border-teal-400" id="ep-path">
+    <button class="w-full py-2 bg-teal-500 text-black font-bold rounded mt-4" onclick="saveProfile()">Save</button>
+  `;
+  openModal();
+}
+function saveProfile() {
+  document.getElementById('profile-name').innerText = document.getElementById('ep-name').value;
+  typewriter(document.getElementById('ep-path').value);
+  closeModal();
+  showToast('Profile updated');
+}
+
+function openCreatePostModal() {
+  document.getElementById('modal-body').innerHTML = `
+    <h3 class="text-xl font-bold mb-4">Create Post</h3>
+    <textarea id="modal-post-input" rows="4" class="w-full bg-white/5 border border-white/10 rounded p-2 mb-3 outline-none focus:border-teal-400 text-white placeholder-slate-400" placeholder="Share your career journey..."></textarea>
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-sm text-slate-300">Domain Tag:</span>
+      <select id="modal-domain-select" class="bg-white/5 border border-white/10 py-1 px-2 rounded outline-none text-white text-sm">
+        <option value="B.Tech → CSE">B.Tech → CSE</option>
+        <option value="MBA → Finance">MBA → Finance</option>
+        <option value="B.Tech → Mech">B.Tech → Mech</option>
+        <option value="General">General</option>
+      </select>
+    </div>
+    <button class="w-full py-2 bg-teal-500 hover:bg-teal-400 text-slate-900 font-bold rounded mt-4 transition-colors" onclick="publishModalPost()">Publish Post</button>
+  `;
+  openModal();
+}
+
+function publishModalPost() {
+  const input = document.getElementById('modal-post-input');
+  if(!input.value.trim()) return;
+  const selDomain = document.getElementById('modal-domain-select').value;
+  
+  const pathEl = document.getElementById('typewriter');
+  const pathText = pathEl ? pathEl.innerText.replace('|', '').trim() : "B.Tech → CSE";
+  
+  const newPost = {
+    id: Date.now(), author: document.getElementById('profile-name').innerText, path: pathText, content: input.value, likes: 0, comments: 0, domain: selDomain, isLiked: false
+  };
+  posts.unshift(newPost);
+  saveData();
+  renderFeed();
+  
+  closeModal();
+  showToast('Post published!');
+  
+  const pc = document.getElementById('post-count');
+  if(pc) {
+    let num = parseInt(pc.innerText);
+    if (!isNaN(num)) pc.innerText = num + 1;
+  }
+}
+
+function toggleSearch() {
+  const ov = document.getElementById('search-overlay');
+  const sb = document.getElementById('search-box');
+  const inp = document.getElementById('search-input');
+  if(ov.classList.contains('active')) {
+    sb.style.transform = 'translateY(-50px)';
+    setTimeout(()=> { ov.classList.remove('active'); document.body.style.overflow = ''; }, 300);
+  } else {
+    ov.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    setTimeout(()=> { sb.style.transform = 'translateY(0)'; inp.focus(); }, 10);
+  }
+}
+
+function handleSearch(val, e) {
+  if(e.key === 'Escape') return toggleSearch();
+  const res = document.getElementById('search-results');
+  if(!val) return res.innerHTML = '';
+  
+  const v = val.toLowerCase();
+  let pMatch = posts.filter(p=>p.content.toLowerCase().includes(v));
+  let cMatch = communities.filter(c=>c.name.toLowerCase().includes(v));
+  
+  let html = pMatch.map(p=> `<div class="p-3 glass rounded mb-2 cursor-pointer hover:border-teal-400 border border-transparent float-1" onclick="toggleSearch(); window.location.hash='#home'"><b>Post by ${p.author}:</b> ${p.content.substring(0,40)}...</div>`).join('');
+  html += cMatch.map(c=> `<div class="p-3 glass rounded mb-2 cursor-pointer hover:border-teal-400 border border-transparent float-2" onclick="toggleSearch(); window.location.hash='#communities'"><b>Community:</b> ${c.name} (${c.domain})</div>`).join('');
+  
+  res.innerHTML = html || '<div class="text-slate-400 text-center p-4">No results found</div>';
+}
+
+function toggleNotifs() {
+  document.getElementById('notif-drop').classList.toggle('hidden');
+  document.getElementById('notif-badge').style.display = 'none';
+}
+
+// PERSISTENCE
+function saveData() {
+  try {
+    localStorage.setItem('g_posts', JSON.stringify(posts));
+    localStorage.setItem('g_comms', JSON.stringify(communities));
+  } catch(e){}
+}
+function loadPersisted() {
+  try {
+    const p = localStorage.getItem('g_posts');
+    const c = localStorage.getItem('g_comms');
+    if(p) posts = JSON.parse(p);
+    if(c) communities = JSON.parse(c);
+  } catch(e){}
+}
+
+// SIMPLE FILE UPLOAD PREVIEW
+function previewImage(e) {
+  const file = e.target.files[0];
+  if(file) {
+    const r = new FileReader();
+    r.onload = e => {
+      document.getElementById('attached-img').src = e.target.result;
+      document.getElementById('attached-img-container').classList.remove('hidden');
+    }
+    r.readAsDataURL(file);
+  }
+}
+function removeImage() {
+  document.getElementById('file-in').value = '';
+  document.getElementById('attached-img-container').classList.add('hidden');
+}
+
+// ACTIVE NAV
+function updateActiveNav() {
+  const secs = ['home', 'explore', 'communities', 'paths'];
+  // simplistic implementation for single page demo
+}
+
+// Global escape key handler
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape') {
+    if(document.getElementById('search-overlay').classList.contains('active')) toggleSearch();
+    closeModal();
+  }
+});
+</script>
+</body>
+</html>
