@@ -203,9 +203,20 @@ export default function Profile({ isGuest }) {
           )}
           {!isGuest && isOther && (
             <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '0.5rem' }}>
-              <button onClick={handleConnectToggle} style={{ background: (targetNetObj.status === 'connected' || targetNetObj.status === 'pending') ? 'rgba(0,0,0,0.5)' : 'var(--teal-500)', border: 'none', color: (targetNetObj.status === 'connected' || targetNetObj.status === 'pending') ? '#fff' : '#000', borderRadius: '0.5rem', padding: '0.4rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', fontWeight: 700 }}>
-                <UserPlus size={14} /> {(targetNetObj.status === 'connected' || targetNetObj.status === 'pending') ? (targetNetObj.status === 'connected' ? 'Connected' : 'Pending Request') : 'Connect'}
-              </button>
+              {targetNetObj.status === 'connected' ? (
+                <>
+                  <button onClick={() => navigate('/messages', { state: { contactId: targetNetObj.id } })} style={{ background: 'var(--teal-500)', border: 'none', color: '#000', borderRadius: '0.5rem', padding: '0.4rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', fontWeight: 700 }}>
+                    <MessageCircle size={14} /> Message
+                  </button>
+                  <button onClick={handleConnectToggle} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', borderRadius: '0.5rem', padding: '0.4rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', fontWeight: 600, backdropFilter: 'blur(4px)' }}>
+                    Connected ✓
+                  </button>
+                </>
+              ) : (
+                <button onClick={handleConnectToggle} style={{ background: targetNetObj.status === 'pending' || targetNetObj.status === 'sent' ? 'rgba(0,0,0,0.5)' : 'var(--teal-500)', border: targetNetObj.status === 'pending' || targetNetObj.status === 'sent' ? '1px solid rgba(255,255,255,0.12)' : 'none', color: targetNetObj.status === 'pending' || targetNetObj.status === 'sent' ? '#fff' : '#000', borderRadius: '0.5rem', padding: '0.4rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', fontWeight: 700, backdropFilter: 'blur(4px)' }}>
+                  <UserPlus size={14} /> {targetNetObj.status === 'pending' || targetNetObj.status === 'sent' ? '⏳ Pending Request' : 'Connect'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -249,6 +260,24 @@ export default function Profile({ isGuest }) {
       </div>
 
       {isGuest && <GuestBanner />}
+
+      {/* Messaging locked notice for unconnected users */}
+      {isOther && targetNetObj.status !== 'connected' && (
+        <div className="glass fade-in-up" style={{ borderRadius: '1rem', padding: '1rem 1.5rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', border: '1px solid rgba(234,179,8,0.2)', background: 'rgba(234,179,8,0.05)' }}>
+          <span style={{ fontSize: '1.4rem' }}>🔒</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fde68a' }}>Messaging is locked</div>
+            <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+              You need to be <strong style={{ color: '#fff' }}>connected</strong> with {displayProfile.name} to send them a message. Send a connection request first.
+            </div>
+          </div>
+          {(targetNetObj.status === 'suggested' || targetNetObj.status === 'connect' || !targetNetObj.status) && (
+            <button onClick={handleConnectToggle} style={{ marginLeft: 'auto', padding: '0.4rem 1rem', background: 'var(--teal-500)', border: 'none', color: '#000', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+              Connect Now
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>

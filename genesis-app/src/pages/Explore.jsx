@@ -187,8 +187,10 @@ export default function Explore() {
               {filteredData.map(d => {
                 const dc = d.demand === 'High' ? 'b-high' : d.demand === 'Medium' ? 'b-med' : 'b-low';
                 const isNew = NEW_CATS.includes(d.cat);
-                const cos = d.companies.slice(0, 4);
-                const extraCos = d.companies.length - 4;
+                const companiesList = Array.isArray(d.companies) ? d.companies : [];
+                const skillsList = Array.isArray(d.skills) ? d.skills : [];
+                const cos = companiesList.slice(0, 4);
+                const extraCos = companiesList.length - 4;
                 const isExpanded = expandedId === d.name;
 
                 return (
@@ -197,25 +199,26 @@ export default function Explore() {
                       <td style={{fontWeight: 500, fontSize: '13px'}}>
                         {d.name} {isNew && <span className="new-badge">new</span>}
                       </td>
-                      <td><span className="badge b-cat">{d.cat}</span></td>
-                      <td><span className={`badge ${dc}`}>{d.demand}</span></td>
+                      <td><span className="badge b-cat">{d.cat || '—'}</span></td>
+                      <td><span className={`badge ${dc}`}>{d.demand || '—'}</span></td>
                       <td>
-                        <div className="sal-row"><div className="sal-exp">Entry (0-2 yrs)</div><div className="sal-val">{d.entry}</div></div>
-                        <div className="sal-row" style={{marginTop: '4px'}}><div className="sal-exp">Mid (3-6 yrs)</div><div className="sal-val">{d.mid}</div></div>
-                        <div className="sal-row" style={{marginTop: '4px'}}><div className="sal-exp">Senior (7+ yrs)</div><div className="sal-val">{d.senior}</div></div>
+                        <div className="sal-row"><div className="sal-exp">Entry (0-2 yrs)</div><div className="sal-val">{d.entry || 'N/A'}</div></div>
+                        <div className="sal-row" style={{marginTop: '4px'}}><div className="sal-exp">Mid (3-6 yrs)</div><div className="sal-val">{d.mid || 'N/A'}</div></div>
+                        <div className="sal-row" style={{marginTop: '4px'}}><div className="sal-exp">Senior (7+ yrs)</div><div className="sal-val">{d.senior || 'N/A'}</div></div>
                       </td>
                       <td>
                         <div className="cos">
                           {cos.map(c => <span key={c} className="co">{c}</span>)}
                           {extraCos > 0 && <span className="co">+{extraCos}</span>}
+                          {companiesList.length === 0 && <span style={{color:'#94a3b8',fontSize:'12px'}}>—</span>}
                         </div>
                       </td>
                       <td style={{textAlign: 'right'}}>
-                        <button 
-                          className="detail-btn" 
-                          onClick={() => setExpandedId(isExpanded ? null : d.name)}
+                        <button
+                          className="detail-btn"
+                          onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : d.name); }}
                         >
-                          {isExpanded ? 'Close' : 'Details'}
+                          {isExpanded ? '✕ Close' : 'Details'}
                         </button>
                       </td>
                     </tr>
@@ -223,25 +226,43 @@ export default function Explore() {
                       <tr className="expand-row">
                         <td colSpan="6">
                           <div className="exp-grid">
-                            <div className="exp-card"><div className="exp-label">Entry level (0-2 yrs)</div><div className="exp-salary">{d.entry}</div><div className="exp-yrs">Freshers / Junior</div></div>
-                            <div className="exp-card"><div className="exp-label">Mid level (3-6 yrs)</div><div className="exp-salary">{d.mid}</div><div className="exp-yrs">Experienced professional</div></div>
-                            <div className="exp-card"><div className="exp-label">Senior level (7+ yrs)</div><div className="exp-salary">{d.senior}</div><div className="exp-yrs">Lead / Architect / Manager</div></div>
+                            <div className="exp-card">
+                              <div className="exp-label">Entry level (0–2 yrs)</div>
+                              <div className="exp-salary">{d.entry || 'N/A'}</div>
+                              <div className="exp-yrs">Freshers / Junior</div>
+                            </div>
+                            <div className="exp-card">
+                              <div className="exp-label">Mid level (3–6 yrs)</div>
+                              <div className="exp-salary">{d.mid || 'N/A'}</div>
+                              <div className="exp-yrs">Experienced professional</div>
+                            </div>
+                            <div className="exp-card">
+                              <div className="exp-label">Senior level (7+ yrs)</div>
+                              <div className="exp-salary">{d.senior || 'N/A'}</div>
+                              <div className="exp-yrs">Lead / Architect / Manager</div>
+                            </div>
                           </div>
-                          <div style={{fontSize: '12px', color: 'var(--color-text-secondary, #94a3b8)', marginBottom: '5px'}}>
-                            Global salary: <strong style={{color: 'var(--color-text-primary, #fff)'}}>{d.global} / year</strong>
-                          </div>
-                          <div style={{fontSize: '12px', color: 'var(--color-text-secondary, #94a3b8)', marginBottom: '6px'}}>
-                            All hiring companies:
-                          </div>
-                          <div className="cos" style={{marginBottom: '10px'}}>
-                            {d.companies.map(c => <span key={c} className="co">{c}</span>)}
-                          </div>
-                          <div style={{fontSize: '12px', color: 'var(--color-text-secondary, #94a3b8)', marginBottom: '6px'}}>
-                            Key skills required:
-                          </div>
-                          <div className="skills-row">
-                            {d.skills.map(s => <span key={s} className="sk">{s}</span>)}
-                          </div>
+                          {d.global && (
+                            <div style={{fontSize: '12px', color: '#94a3b8', marginBottom: '8px'}}>
+                              🌍 Global salary: <strong style={{color:'#fff'}}>{d.global} / year</strong>
+                            </div>
+                          )}
+                          {companiesList.length > 0 && (
+                            <>
+                              <div style={{fontSize: '12px', color: '#94a3b8', marginBottom: '6px'}}>🏢 All hiring companies:</div>
+                              <div className="cos" style={{marginBottom: '10px'}}>
+                                {companiesList.map(c => <span key={c} className="co">{c}</span>)}
+                              </div>
+                            </>
+                          )}
+                          {skillsList.length > 0 && (
+                            <>
+                              <div style={{fontSize: '12px', color: '#94a3b8', marginBottom: '6px'}}>🛠 Key skills required:</div>
+                              <div className="skills-row">
+                                {skillsList.map(s => <span key={s} className="sk">{s}</span>)}
+                              </div>
+                            </>
+                          )}
                         </td>
                       </tr>
                     )}
