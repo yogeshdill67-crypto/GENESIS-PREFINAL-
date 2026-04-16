@@ -1,7 +1,7 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Heart, MessageSquare, Share2, MoreHorizontal, Trash2, Edit2 } from 'lucide-react'
 import { showToast } from './Toast'
-import { getProfile } from '../data/store'
 import Modal from './Modal'
 
 function timeSince(ts) {
@@ -14,17 +14,17 @@ function timeSince(ts) {
   return `${Math.floor(h / 24)}d ago`
 }
 
-export default function PostCard({ post, onLike, onDelete, onEdit, onComment, onUpdatePost, index }) {
+export default function PostCard({ post, onLike, onDelete, onEdit, onComment, onUpdatePost, index, currentUser, isGuest }) {
   const [showComments, setShowComments] = useState(false)
-  const [commentInput, setCommentInput] = useState('')
-  const [replyingTo, setReplyingTo] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState(post.content)
-
-  const currentUser = getProfile()?.name || 'Alex Dev'
+  const [commentInput, setCommentInput] = useState('')
+  const [replyingTo, setReplyingTo] = useState(null)
 
   function handleLike() {
+    if (isGuest) { showToast('Please sign in to like posts', 'error'); return }
     onLike(post.id)
     if (!post.isLiked) burstHearts()
   }
@@ -56,6 +56,7 @@ export default function PostCard({ post, onLike, onDelete, onEdit, onComment, on
     }
 
     if (replyingTo && onUpdatePost) {
+      if (isGuest) { showToast('Please sign in to reply', 'error'); setCommentInput(''); setReplyingTo(null); return }
       const currentComments = Array.isArray(post.commentsList) ? post.commentsList : []
       const updatedComments = currentComments.map(c => {
         if (c.id === replyingTo.parentId) {
@@ -65,6 +66,7 @@ export default function PostCard({ post, onLike, onDelete, onEdit, onComment, on
       })
       onUpdatePost({ ...post, comments: (post.comments || 0) + 1, commentsList: updatedComments })
     } else {
+      if (isGuest) { showToast('Please sign in to comment', 'error'); setCommentInput(''); return }
       onComment(post.id, newObj)
     }
     setCommentInput('')
@@ -109,7 +111,7 @@ export default function PostCard({ post, onLike, onDelete, onEdit, onComment, on
     >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate('/profile/' + post.author)}>
           <div style={{
             width: '42px', height: '42px', borderRadius: '50%',
             background: 'linear-gradient(135deg, var(--teal-400), var(--violet-500))',
@@ -125,9 +127,11 @@ export default function PostCard({ post, onLike, onDelete, onEdit, onComment, on
         </div>
 
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setMenuOpen(o => !o)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.25rem' }}>
-            <MoreHorizontal size={20} />
-          </button>
+          {!isGuest && (
+            <button onClick={() => setMenuOpen(o => !o)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.25rem' }}>
+              <MoreHorizontal size={20} />
+            </button>
+          )}
           {menuOpen && (
             <div className="glass" style={{ position: 'absolute', right: 0, top: '2rem', borderRadius: '0.6rem', minWidth: '140px', zIndex: 50, padding: '0.3rem' }}>
               <button onClick={() => { navigator.clipboard.writeText('https://genesis.app/p/' + post.id); showToast('Link copied!'); setMenuOpen(false) }}

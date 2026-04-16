@@ -4,11 +4,21 @@ import PostCard from '../components/PostCard'
 import { showToast } from '../components/Toast'
 import { getPosts, savePosts, getProfile } from '../data/store'
 import { User, MessageCircle } from 'lucide-react'
+import GuestBanner from '../components/GuestBanner'
 
-export default function Home() {
-  const [posts, setPosts] = useState(getPosts)
-  const [profile] = useState(getProfile)
+export default function Home({ isGuest }) {
+  const [posts, setPosts] = useState([])
+  const [profile, setProfile] = useState(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    async function load() {
+      const [ps, prof] = await Promise.all([getPosts(), getProfile()])
+      setPosts(ps)
+      setProfile(prof)
+    }
+    load()
+  }, [])
 
   function handleLike(id) {
     const updated = posts.map(p =>
@@ -51,23 +61,26 @@ export default function Home() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1.5rem', paddingTop: '5rem' }}>
       {/* Create Post Prompt */}
-      <div className="glass" style={{ borderRadius: '1.25rem', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem', cursor: 'text', transition: 'all 0.2s' }} onClick={() => navigate('/post')}>
-        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--teal-400), var(--violet-500))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem', color: '#fff', flexShrink: 0 }}>
-          {profile?.name ? profile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'ME'}
+      {!isGuest && (
+        <div className="glass" style={{ borderRadius: '1.25rem', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem', cursor: 'text', transition: 'all 0.2s' }} onClick={() => navigate('/post')}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--teal-400), var(--violet-500))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem', color: '#fff', flexShrink: 0 }}>
+            {profile?.name ? profile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'ME'}
+          </div>
+          <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '2rem', padding: '0.8rem 1.25rem', color: '#94a3b8', fontSize: '0.95rem' }} className="hover-bg">
+            Start a post, share your journey...
+          </div>
         </div>
-        <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '2rem', padding: '0.8rem 1.25rem', color: '#94a3b8', fontSize: '0.95rem' }} className="hover-bg">
-          Start a post, share your journey...
-        </div>
-      </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {isGuest && <GuestBanner />}
         {posts.length === 0 ? (
           <div className="glass" style={{ borderRadius: '1rem', padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
             <User size={40} style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.3 }} />
             No posts yet. Be the first to share!
           </div>
         ) : posts.map((p, i) => (
-          <PostCard key={p.id} post={p} index={i} onLike={handleLike} onDelete={handleDelete} onEdit={handleEdit} onComment={handleComment} onUpdatePost={handleUpdatePost} />
+          <PostCard key={p.id} post={p} index={i} onLike={handleLike} onDelete={handleDelete} onEdit={handleEdit} onComment={handleComment} onUpdatePost={handleUpdatePost} currentUser={profile?.name || 'Alex Dev'} isGuest={isGuest} />
         ))}
       </div>
     </div>

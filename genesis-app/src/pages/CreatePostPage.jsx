@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Image, Compass, X, Send, ArrowLeft, Tag } from 'lucide-react'
-import { getProfile, getPosts, savePosts } from '../data/store'
+import { getProfile, getPosts, savePosts, getAuth } from '../data/store'
 import { showToast } from '../components/Toast'
 
 const DOMAINS = ['B.Tech → CSE', 'B.Tech → Mech', 'B.Tech → Civil', 'MBA → Marketing', 'MBA → Finance', 'General']
@@ -13,9 +13,25 @@ export default function CreatePostPage() {
   const [selectedTags, setSelectedTags] = useState([])
   const [imgSrc, setImgSrc] = useState(null)
   const [publishing, setPublishing] = useState(false)
+  const [profile, setProfile] = useState(null)
   const fileRef = useRef()
-  const profile = getProfile()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    async function load() {
+      const auth = getAuth()
+      if (auth?.isGuest) {
+        showToast('Please sign in to create posts', 'error')
+        navigate('/login')
+        return
+      }
+      const p = await getProfile()
+      setProfile(p)
+    }
+    load()
+  }, [])
+
+  if (!profile) return <div style={{ paddingTop: '10rem', textAlign: 'center', color: '#94a3b8' }}>Loading profile...</div>
 
   const charLimit = 1000
   const remaining = charLimit - content.length
@@ -32,12 +48,12 @@ export default function CreatePostPage() {
     reader.readAsDataURL(file)
   }
 
-  function publish() {
+  async function publish() {
     if (!content.trim()) { showToast('Write something first!', 'error'); return }
     setPublishing(true)
 
-    setTimeout(() => {
-      const posts = getPosts()
+    try {
+      const posts = await getPosts()
       const newPost = {
         id: Date.now(),
         author: profile.name,
@@ -49,10 +65,14 @@ export default function CreatePostPage() {
         timestamp: Date.now(),
         image: imgSrc
       }
-      savePosts([newPost, ...posts])
+      await savePosts([newPost, ...posts])
       showToast('Post published! 🚀')
       navigate('/')
-    }, 800)
+    } catch (e) {
+      showToast('Error publishing post', 'error')
+    } finally {
+      setPublishing(false)
+    }
   }
 
   const initials = profile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)

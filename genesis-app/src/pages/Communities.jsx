@@ -1,13 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getCommunities, saveCommunities } from '../data/store'
 import { showToast } from '../components/Toast'
 import Modal from '../components/Modal'
 import { Users, Star, Link, Video } from 'lucide-react'
 
 export default function Communities() {
-  const [communities, setCommunities] = useState(getCommunities)
+  const [communities, setCommunities] = useState([])
   const [filter, setFilter] = useState('All')
   const [active, setActive] = useState(null)
+
+  useEffect(() => {
+    async function load() {
+      const comms = await getCommunities()
+      setCommunities(comms || [])
+    }
+    load()
+  }, [])
 
   function toggleJoin(id) {
     const updated = communities.map(c =>

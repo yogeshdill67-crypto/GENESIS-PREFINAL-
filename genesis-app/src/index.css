@@ -181,3 +181,18 @@ body.light-mode .inp { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.
 .text-muted { color: var(--slate-400); }
 .font-mono  { font-family: var(--font-mono); }
 .shadow-teal { box-shadow: 0 0 20px rgba(45,212,191,0.25); }
+
+/* ── AI Chatbot ── */
+.chat-msg-user {
+  background: var(--teal-500);
+  color: #000;
+}
+.chat-msg-ai {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+}
+body.light-mode .chat-msg-ai {
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+

@@ -9,10 +9,11 @@ import Communities from './pages/Communities'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
+import CareerAdvisor from './pages/CareerAdvisor'
 import CreatePostPage from './pages/CreatePostPage'
 import Messages from './pages/Messages'
 import AIChatbot from './components/AIChatbot'
-import { getTheme, saveTheme, isLoggedIn, getProfile, getPosts } from './data/store'
+import { getTheme, saveTheme, isLoggedIn, getProfile, getPosts, getAuth } from './data/store'
 
 function ProtectedRoute({ children }) {
   return isLoggedIn() ? children : <Navigate to="/login" replace />
@@ -45,9 +46,38 @@ class ErrorBoundary extends React.Component {
 
 export default function App() {
   const [theme, setTheme] = useState(getTheme)
-  const [profile, setProfile] = useState(getProfile)
-  const [posts, setPosts] = useState(getPosts)
+  const [profile, setProfile] = useState(null)
+  const [posts, setPosts] = useState([])
+  const [isGuest, setIsGuest] = useState(false)
   const location = useLocation()
+
+  useEffect(() => {
+    async function init() {
+      const auth = getAuth()
+      // Detect guest: explicit flag, or legacy demo account
+      let guestDetected = !!auth?.isGuest || auth?.email === 'guest@genesis.app'
+      
+      // Auto-patch: if this is Alex Dev, strip the guest flag if it was accidentally added.
+      if (auth?.email === 'alex@genesis.app' || auth?.name === 'Alex Dev') {
+        guestDetected = false
+        if (auth?.isGuest) {
+          const newAuth = { ...auth }
+          delete newAuth.isGuest
+          localStorage.setItem('g_auth', JSON.stringify(newAuth))
+        }
+      } else if (guestDetected && !auth?.isGuest && auth) {
+        // Auto-patch actual guests
+        localStorage.setItem('g_auth', JSON.stringify({ ...auth, isGuest: true }))
+      }
+
+      
+      setIsGuest(guestDetected)
+      const [p, ps] = await Promise.all([getProfile(), getPosts()])
+      setProfile(p)
+      setPosts(ps)
+    }
+    init()
+  }, [location.pathname])
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -72,24 +102,19 @@ export default function App() {
       <div className="orb orb-2" />
 
       {!hideNav && (
-        <Navbar theme={theme} onToggleTheme={toggleTheme} profile={profile} posts={posts} />
-      )}
-
-      {isProfileIncomplete && (
-        <div style={{ position: 'fixed', top: '64px', left: 0, right: 0, background: 'rgba(239, 68, 68, 0.2)', borderBottom: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', padding: '0.5rem', textAlign: 'center', fontSize: '0.85rem', zIndex: 99, backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-          <span>⚠️ <strong>Profile Incomplete:</strong> Add your details to connect with peers!</span>
-          <a href="/profile" style={{ color: '#fff', textDecoration: 'underline', fontWeight: 600 }}>Update now →</a>
-        </div>
+        <Navbar theme={theme} onToggleTheme={toggleTheme} profile={profile} posts={posts} isGuest={isGuest} />
       )}
 
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        <Route path="/advisor" element={<ProtectedRoute><CareerAdvisor /></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><Home isGuest={isGuest} /></ProtectedRoute>} />
         <Route path="/network" element={<ProtectedRoute><Network /></ProtectedRoute>} />
         <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
         <Route path="/communities" element={<ProtectedRoute><Communities /></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile isGuest={isGuest} /></ProtectedRoute>} />
+        <Route path="/profile/:username" element={<ProtectedRoute><Profile isGuest={isGuest} /></ProtectedRoute>} />
         <Route path="/post" element={<ProtectedRoute><CreatePostPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings theme={theme} onToggleTheme={toggleTheme} /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />

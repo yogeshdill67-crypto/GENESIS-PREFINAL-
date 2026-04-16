@@ -3,14 +3,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Search, Bell, Moon, Sun, User, Menu, X, PenSquare, MessageCircle } from 'lucide-react'
 import { sampleNotifications, logout } from '../data/store'
 
-export default function Navbar({ theme, onToggleTheme, profile, posts }) {
+export default function Navbar({ theme, onToggleTheme, profile, posts, isGuest }) {
   const [scrolled, setScrolled] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchVal, setSearchVal] = useState('')
-  const [notifs, setNotifs] = useState(sampleNotifications)
+  const [notifs, setNotifs] = useState(sampleNotifications || [])
   const location = useLocation()
   const navigate = useNavigate()
   const searchRef = useRef(null)
@@ -49,7 +49,7 @@ export default function Navbar({ theme, onToggleTheme, profile, posts }) {
     setNotifs(n => n.map(x => ({ ...x, read: true })))
   }
 
-  const unread = notifs.filter(n => !n.read).length
+  const unread = (notifs || []).filter(n => !n.read).length
 
   const navLinks = [
     { to: '/', label: 'Home' },
@@ -129,18 +129,22 @@ export default function Navbar({ theme, onToggleTheme, profile, posts }) {
             </button>
 
             {/* Create Post */}
-            <div style={{ position: 'relative' }}>
-              <button className="icon-btn" onClick={() => navigate('/post')} title="Create Post" style={{ color: 'var(--teal-400)' }}>
-                <PenSquare size={20} />
-              </button>
-            </div>
+            {!isGuest && (
+              <div style={{ position: 'relative' }}>
+                <button className="icon-btn" onClick={() => navigate('/post')} title="Create Post" style={{ color: 'var(--teal-400)' }}>
+                  <PenSquare size={20} />
+                </button>
+              </div>
+            )}
 
             {/* Messages */}
-            <div style={{ position: 'relative' }}>
-              <button className="icon-btn" onClick={() => navigate('/messages')} title="Messages">
-                <MessageCircle size={20} />
-              </button>
-            </div>
+            {!isGuest && (
+              <div style={{ position: 'relative' }}>
+                <button className="icon-btn" onClick={() => navigate('/messages')} title="Messages">
+                  <MessageCircle size={20} />
+                </button>
+              </div>
+            )}
 
             {/* Notifications */}
             <div style={{ position: 'relative' }}>
@@ -151,7 +155,7 @@ export default function Navbar({ theme, onToggleTheme, profile, posts }) {
               {notifOpen && (
                 <div className="glass dropdown" style={{ width: '280px' }}>
                   <div style={{ padding: '0.6rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', fontWeight: 600, fontSize: '0.9rem' }}>Notifications</div>
-                  {notifs.map(n => (
+                  {(notifs || []).map(n => (
                     <div key={n.id} style={{ padding: '0.6rem 1rem', fontSize: '0.875rem', opacity: n.read ? 0.5 : 1, cursor: 'pointer', borderRadius: '0.5rem' }}>
                       {n.text} <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>· {n.time}</span>
                     </div>
@@ -175,15 +179,17 @@ export default function Navbar({ theme, onToggleTheme, profile, posts }) {
                   <img src={profile.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, var(--teal-500), var(--violet-500))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>
-                    {profile?.name ? profile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : <User size={16} style={{ color: 'var(--teal-400)' }} />}
+                    {isGuest ? 'GU' : (profile?.name ? profile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : <User size={16} style={{ color: 'var(--teal-400)' }} />)}
                   </div>
                 )}
               </button>
               {profileOpen && (
                 <div className="glass dropdown" style={{ width: '200px' }} onMouseLeave={() => setProfileOpen(false)}>
                   <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div style={{ fontWeight: 600 }}>{profile?.name || 'Alex Dev'}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--slate-400)', fontFamily: 'var(--font-mono)' }}>{(profile?.path || '').split(' → ').pop()}</div>
+                    <div style={{ fontWeight: 600 }}>{isGuest ? 'Guest User' : (profile?.name || 'User')}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--slate-400)', fontFamily: 'var(--font-mono)' }}>
+                      {isGuest ? 'Guest Mode' : (profile?.path || '').split(' → ').pop()}
+                    </div>
                   </div>
                   <Link to="/profile" className="dropdown-item" onClick={() => setProfileOpen(false)}>View Profile</Link>
                   <Link to="/profile" className="dropdown-item" onClick={() => setProfileOpen(false)}>My Posts</Link>

@@ -1,12 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getProfile, saveProfile, getTheme, saveTheme } from '../data/store'
 import { showToast } from '../components/Toast'
 import { Sun, Moon, Bell, Lock, Trash2, Download, ChevronRight } from 'lucide-react'
 
 export default function Settings({ theme, onToggleTheme }) {
-  const [profile, setProfile] = useState(getProfile)
+  const [profile, setProfile] = useState(null)
   const [notifications, setNotifications] = useState({ likes: true, comments: true, newPaths: true, community: false })
   const [privacy, setPrivacy] = useState({ publicProfile: true, showEmail: false })
+
+  useEffect(() => {
+    async function load() {
+      const p = await getProfile()
+      setProfile(p)
+    }
+    load()
+  }, [])
 
   function Toggle({ value, onChange }) {
     return (

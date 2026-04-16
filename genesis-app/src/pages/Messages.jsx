@@ -1,38 +1,52 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getConversations, saveConversations, getNetwork } from '../data/store';
+import { getConversations, saveConversations, getNetwork, getAuth } from '../data/store';
 import { Send, ArrowLeft, Search, User } from 'lucide-react';
+import { showToast } from '../components/Toast';
 
 export default function Messages() {
-  const [conversations, setConversations] = useState(getConversations());
+  const [conversations, setConversations] = useState([]);
   const [activeChatId, setActiveChatId] = useState(null);
   const [inputText, setInputText] = useState('');
   const [search, setSearch] = useState('');
+  const [network, setNetwork] = useState([]);
   
   const location = useLocation();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (location.state && location.state.contactId) {
-      const contactId = location.state.contactId;
-      let chat = conversations.find(c => c.contactId === contactId);
-      if (!chat) {
-        const net = getNetwork();
-        const person = net.find(n => n.id === contactId);
-        if (person) {
-          chat = { id: Date.now(), contactId, contactName: person.name, avatar: null, unread: 0, messages: [] };
-          const newConvos = [chat, ...conversations];
-          setConversations(newConvos);
-          saveConversations(newConvos);
-        }
+    async function load() {
+      const auth = getAuth()
+      if (auth?.isGuest) {
+        showToast('Please sign in to use messages', 'error')
+        navigate('/login')
+        return
       }
-      if (chat) setActiveChatId(chat.id);
-      navigate('/messages', { replace: true, state: {} });
-    } else if (!activeChatId && conversations.length > 0) {
-      setActiveChatId(conversations[0].id);
+      const [convos, net] = await Promise.all([getConversations(), getNetwork()]);
+      setConversations(convos);
+      setNetwork(net);
+
+      if (location.state && location.state.contactId) {
+        const contactId = location.state.contactId;
+        let chat = convos.find(c => c.contactId === contactId);
+        if (!chat) {
+          const person = net.find(n => n.id === contactId);
+          if (person) {
+            chat = { id: Date.now(), contactId, contactName: person.name, avatar: null, unread: 0, messages: [] };
+            const newConvos = [chat, ...convos];
+            setConversations(newConvos);
+            saveConversations(newConvos);
+          }
+        }
+        if (chat) setActiveChatId(chat.id);
+        navigate('/messages', { replace: true, state: {} });
+      } else if (!activeChatId && convos.length > 0) {
+        setActiveChatId(convos[0].id);
+      }
     }
-  }, [location, conversations, navigate, activeChatId]);
+    load();
+  }, [location, navigate, activeChatId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

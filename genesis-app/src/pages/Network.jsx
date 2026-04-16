@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getNetwork, saveNetwork } from '../data/store';
 import { UserPlus, UserCheck, X, Clock } from 'lucide-react';
 import { showToast } from '../components/Toast';
 
 export function NetworkCard({ person, onAction, actionLabel, actionIcon, secondaryAction, secondaryLabel, secondaryIcon }) {
+  const navigate = useNavigate();
   const initials = person.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   return (
-    <div className="glass fade-in-up" style={{ borderRadius: '1rem', padding: '1.25rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
+    <div className="glass fade-in-up" onClick={() => navigate('/profile/' + person.name)} style={{ borderRadius: '1rem', padding: '1.25rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative', cursor: 'pointer' }}>
       <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--slate-700), var(--slate-800))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 700, color: '#fff', marginBottom: '1rem', border: '2px solid rgba(255,255,255,0.1)' }}>
         {initials}
       </div>
@@ -17,11 +18,11 @@ export function NetworkCard({ person, onAction, actionLabel, actionIcon, seconda
       
       <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
         {secondaryAction && (
-          <button onClick={() => secondaryAction(person.id)} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', justifyContent: 'center', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.8rem' }}>
+          <button onClick={(e) => { e.stopPropagation(); secondaryAction(person.id); }} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', justifyContent: 'center', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.8rem' }}>
             {secondaryIcon} {secondaryLabel}
           </button>
         )}
-        <button onClick={() => onAction(person.id)} style={{ flex: 1, padding: '0.5rem', background: 'var(--teal-500)', color: '#000', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center', fontSize: '0.8rem', fontWeight: 700 }}>
+        <button onClick={(e) => { e.stopPropagation(); onAction(person.id); }} style={{ flex: 1, padding: '0.5rem', background: 'var(--teal-500)', color: '#000', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center', fontSize: '0.8rem', fontWeight: 700 }}>
           {actionIcon} {actionLabel}
         </button>
       </div>
@@ -30,8 +31,16 @@ export function NetworkCard({ person, onAction, actionLabel, actionIcon, seconda
 }
 
 export default function Network() {
-  const [network, setNetwork] = useState(getNetwork());
+  const [network, setNetwork] = useState([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function load() {
+      const net = await getNetwork();
+      setNetwork(net || []);
+    }
+    load();
+  }, []);
 
   const pending = network.filter(n => n.status === 'pending');
   const suggested = network.filter(n => n.status === 'suggested');

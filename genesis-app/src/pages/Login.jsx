@@ -1,26 +1,28 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { login } from '../data/store'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { login, CAREER_CATEGORIES } from '../data/store'
 import { showToast } from '../components/Toast'
-import { Eye, EyeOff, User, Lock, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, User, Lock, Sparkles, Briefcase } from 'lucide-react'
 
 export default function Login() {
-  const [tab, setTab] = useState('login')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [tab, setTab] = useState(location.state?.tab || 'login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!email || !password) { showToast('Fill in all fields', 'error'); return }
     setLoading(true)
     setTimeout(() => {
-      login({ name: name || email.split('@')[0], email, isSignup: tab === 'signup' })
-      showToast('Welcome to GENESIS! 🚀')
-      navigate('/')
+      const isSignup = tab === 'signup'
+      login({ name: name || email.split('@')[0], email, isSignup })
+      showToast(isSignup ? 'Account created successfully! 🚀' : 'Welcome back to GENESIS! 🚀')
+      navigate(isSignup ? '/advisor' : '/')
       setLoading(false)
     }, 900)
   }
@@ -102,9 +104,9 @@ export default function Login() {
         </form>
 
         {/* Demo bypass */}
-        <button onClick={() => { login({ name: 'Alex Dev', email: 'alex@genesis.app' }); navigate('/') }}
+        <button onClick={() => { login({ name: 'Guest User', email: 'guest@genesis.app', isGuest: true }); navigate('/') }}
           style={{ width: '100%', marginTop: '1.25rem', padding: '0.5rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.6rem', color: '#94a3b8', cursor: 'pointer', fontSize: '0.8rem' }}>
-          Continue as Guest (Demo)
+          👁️ Continue as Guest
         </button>
       </div>
 
